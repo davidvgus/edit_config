@@ -482,6 +482,8 @@ def edit_group_config():
                                 )
                                 if system_name not in new_systems[access_code]:
                                     systems_parent.remove(system)
+            # Add the processed group back to root
+            root.append(group)
 
         # Save modified XML using custom writer
         output_path = os.path.join(NEW_CONFIGS_FOLDER, f"new_{REQUIRED_FILES['file1']}")
