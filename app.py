@@ -258,39 +258,43 @@ def save_new_config(original_files, modified_files):
     config_entry = {
         "id": timestamp,
         "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "zip_filename": f"{timestamp}_new_config_files.zip",
         "files": {},
         "based_on": {},
     }
 
-    # Create zip file for the new configs
-    zip_path = os.path.join(NEW_CONFIGS_FOLDER, config_entry["zip_filename"])
-    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zipf:
-        # Add modified files to zip
-        for file_key, file_path in modified_files.items():
-            if os.path.exists(file_path):
-                # Read the modified file
-                with open(file_path, "rb") as f:
-                    file_content = BytesIO(f.read())
+    # Process each modified file
+    for file_key, file_path in modified_files.items():
+        if os.path.exists(file_path):
+            # Read the modified file
+            with open(file_path, "rb") as f:
+                file_content = BytesIO(f.read())
 
-                # Extract access codes
-                file_content.seek(0)
-                access_codes = get_access_codes_from_xml(file_content)
+            # Extract access codes
+            file_content.seek(0)
+            access_codes = get_access_codes_from_xml(file_content)
 
-                # Add to zip
-                original_name = os.path.basename(file_path)
-                zipf.write(file_path, original_name)
+            # Get original filename without the new_ prefix
+            original_name = os.path.basename(file_path)
+            if original_name.startswith("new_"):
+                original_name = original_name[4:]
 
-                # Add to entry
-                config_entry["files"][file_key] = {
-                    "original_name": original_name,
-                    "access_codes": access_codes,
-                }
+            # Copy file to new location without new_ prefix
+            new_path = os.path.join(NEW_CONFIGS_FOLDER, original_name)
+            shutil.copy2(file_path, new_path)
 
-        # Store information about original files
-        for file_key, file in original_files.items():
-            if file and file.filename:
-                config_entry["based_on"][file_key] = secure_filename(file.filename)
+            # Add to entry
+            config_entry["files"][file_key] = {
+                "original_name": original_name,
+                "access_codes": access_codes,
+            }
+
+            # Remove the temporary file with new_ prefix
+            os.remove(file_path)
+
+    # Store information about original files
+    for file_key, file in original_files.items():
+        if file and file.filename:
+            config_entry["based_on"][file_key] = secure_filename(file.filename)
 
     # Add entry to metadata
     metadata.append(config_entry)
@@ -683,9 +687,9 @@ def new_configs():
     return render_template("new_configs.html", configs=metadata)
 
 
-@app.route("/new-configs/download/<timestamp>")
-def download_new_config(timestamp):
-    """Download a zip file of new configurations"""
+@app.route("/new-configs/download/<config_id>/<path:filename>")
+def download_new_config(config_id, filename):
+    """Download a specific configuration file"""
     # Load metadata
     metadata_path = os.path.join(NEW_CONFIGS_FOLDER, NEW_CONFIGS_METADATA)
     if not os.path.exists(metadata_path):
@@ -696,19 +700,18 @@ def download_new_config(timestamp):
         metadata = json.load(f)
 
     # Find the config entry
-    config_entry = next((entry for entry in metadata if entry["id"] == timestamp), None)
+    config_entry = next((entry for entry in metadata if entry["id"] == config_id), None)
     if not config_entry:
         flash("Configuration not found")
         return redirect(url_for("new_configs"))
 
-    zip_path = os.path.join(NEW_CONFIGS_FOLDER, config_entry["zip_filename"])
-    if not os.path.exists(zip_path):
+    # Check if the requested file exists
+    file_path = os.path.join(NEW_CONFIGS_FOLDER, filename)
+    if not os.path.exists(file_path):
         flash("Configuration file not found")
         return redirect(url_for("new_configs"))
 
-    return send_file(
-        zip_path, as_attachment=True, download_name=config_entry["zip_filename"]
-    )
+    return send_file(file_path, as_attachment=True, download_name=filename)
 
 
 @app.route("/archive/delete/<timestamp>")
