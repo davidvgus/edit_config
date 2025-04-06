@@ -807,20 +807,21 @@ def delete_all_archives():
     return redirect(url_for("archive"))
 
 
-@app.route("/new-configs/delete-all")
+@app.route("/delete-all-new-configs")
 def delete_all_new_configs():
-    """Delete all new config entries and their associated files"""
+    """Delete all configuration entries and their associated files"""
     # Load metadata
     metadata_path = os.path.join(NEW_CONFIGS_FOLDER, NEW_CONFIGS_METADATA)
     if os.path.exists(metadata_path):
         with open(metadata_path, "r") as f:
             metadata = json.load(f)
 
-        # Remove all zip files
+        # Remove all files
         for entry in metadata:
-            zip_path = os.path.join(NEW_CONFIGS_FOLDER, entry["zip_filename"])
-            if os.path.exists(zip_path):
-                os.remove(zip_path)
+            for file_key, file_info in entry["files"].items():
+                file_path = os.path.join(NEW_CONFIGS_FOLDER, file_info["original_name"])
+                if os.path.exists(file_path):
+                    os.remove(file_path)
 
         # Clear metadata
         with open(metadata_path, "w") as f:

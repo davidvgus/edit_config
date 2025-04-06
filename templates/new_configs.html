@@ -11,7 +11,7 @@
         <table class="table table-striped">
             <thead>
                 <tr>
-                    <th>Instructor Code</th>
+                    <th>Access Code</th>
                     <th>Date</th>
                     <th>Files</th>
                     <th>Actions</th>
@@ -21,19 +21,13 @@
                 {% for config in configs %}
                 <tr>
                     <td>
-                        {%- set instructor_code = none -%}
+                        {%- set ns = namespace(access_code='') -%}
                         {%- for file_key, file_info in config.files.items() -%}
-                        {%- for code in file_info.access_codes -%}
-                        {%- if code.endswith('00') -%}
-                        {%- set instructor_code = code -%}
+                        {%- if not ns.access_code and file_info.access_codes -%}
+                        {%- set ns.access_code = file_info.access_codes[0][:8] -%}
                         {%- endif -%}
                         {%- endfor -%}
-                        {%- endfor -%}
-                        {%- if instructor_code -%}
-                        {{ instructor_code }}
-                        {%- else -%}
-                        <span class="text-muted">No instructor code</span>
-                        {%- endif -%}
+                        {{ ns.access_code }}
                     </td>
                     <td>{{ config.timestamp }}</td>
                     <td>
