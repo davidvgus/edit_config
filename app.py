@@ -670,25 +670,43 @@ def download_archive(timestamp):
 
 @app.route("/new-configs")
 def new_configs():
-    """Display and manage new configurations."""
-    configs = get_new_configs()
-    return render_template("new_configs.html", configs=configs)
+    """Display new configurations page"""
+    metadata_path = os.path.join(NEW_CONFIGS_FOLDER, NEW_CONFIGS_METADATA)
+    if os.path.exists(metadata_path):
+        with open(metadata_path, "r") as f:
+            metadata = json.load(f)
+    else:
+        metadata = []
+
+    return render_template("new_configs.html", configs=metadata)
 
 
-@app.route("/new-configs/download/<int:config_id>/<path:filename>")
-def download_new_config(config_id, filename):
-    """Download a specific file from a new configuration entry."""
-    config_entry = get_new_config_by_id(config_id)
+@app.route("/new-configs/download/<timestamp>")
+def download_new_config(timestamp):
+    """Download a zip file of new configurations"""
+    # Load metadata
+    metadata_path = os.path.join(NEW_CONFIGS_FOLDER, NEW_CONFIGS_METADATA)
+    if not os.path.exists(metadata_path):
+        flash("Configuration not found")
+        return redirect(url_for("new_configs"))
+
+    with open(metadata_path, "r") as f:
+        metadata = json.load(f)
+
+    # Find the config entry
+    config_entry = next((entry for entry in metadata if entry["id"] == timestamp), None)
     if not config_entry:
         flash("Configuration not found")
         return redirect(url_for("new_configs"))
 
-    file_path = os.path.join(NEW_CONFIGS_FOLDER, filename)
-    if not os.path.exists(file_path):
-        flash("File not found")
+    zip_path = os.path.join(NEW_CONFIGS_FOLDER, config_entry["zip_filename"])
+    if not os.path.exists(zip_path):
+        flash("Configuration file not found")
         return redirect(url_for("new_configs"))
 
-    return send_file(file_path, as_attachment=True, download_name=filename)
+    return send_file(
+        zip_path, as_attachment=True, download_name=config_entry["zip_filename"]
+    )
 
 
 @app.route("/archive/delete/<timestamp>")
