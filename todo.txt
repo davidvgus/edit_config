@@ -1,0 +1,16 @@
+make an archive page
+-every time files are uploaded
+-they are tagged with the access code
+- and added to the archive page
+- and are downloadable.
+- that way you can always go back to
+- the original configuration 
+- and you know where it came from. 
+
+
+use a list of ip addresses
+to figure out what should be
+in the config files. 
+add a field to the import page
+this should allow to auto select
+what check boxes should be selected.
