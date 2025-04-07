@@ -14,3 +14,5 @@ in the config files.
 add a field to the import page
 this should allow to auto select
 what check boxes should be selected.
+
+add users with isolated environments
