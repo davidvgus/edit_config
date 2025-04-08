@@ -582,10 +582,11 @@ def delete_archive(timestamp):
         flash("Archive entry not found")
         return redirect(url_for("archive"))
 
-    # Remove the zip file
-    zip_path = os.path.join(ARCHIVE_FOLDER, archive_entry["zip_filename"])
-    if os.path.exists(zip_path):
-        os.remove(zip_path)
+    # Remove the archived files
+    for file_info in archive_entry["files"].values():
+        archive_path = os.path.join(ARCHIVE_FOLDER, file_info["archive_name"])
+        if os.path.exists(archive_path):
+            os.remove(archive_path)
 
     # Remove entry from metadata
     metadata.remove(archive_entry)
@@ -616,10 +617,11 @@ def delete_new_config(timestamp):
         flash("Configuration entry not found")
         return redirect(url_for("new_configs"))
 
-    # Remove the zip file
-    zip_path = os.path.join(NEW_CONFIGS_FOLDER, config_entry["zip_filename"])
-    if os.path.exists(zip_path):
-        os.remove(zip_path)
+    # Remove the configuration files
+    for file_info in config_entry["files"].values():
+        file_path = os.path.join(NEW_CONFIGS_FOLDER, file_info["original_name"])
+        if os.path.exists(file_path):
+            os.remove(file_path)
 
     # Remove entry from metadata
     metadata.remove(config_entry)
@@ -641,11 +643,12 @@ def delete_all_archives():
         with open(metadata_path, "r") as f:
             metadata = json.load(f)
 
-        # Remove all zip files
+        # Remove all archived files
         for entry in metadata:
-            zip_path = os.path.join(ARCHIVE_FOLDER, entry["zip_filename"])
-            if os.path.exists(zip_path):
-                os.remove(zip_path)
+            for file_info in entry["files"].values():
+                archive_path = os.path.join(ARCHIVE_FOLDER, file_info["archive_name"])
+                if os.path.exists(archive_path):
+                    os.remove(archive_path)
 
         # Clear metadata
         with open(metadata_path, "w") as f:
