@@ -29,7 +29,7 @@ ARCHIVE_FOLDER = "archives"
 NEW_CONFIGS_FOLDER = "new_configs"
 ARCHIVE_METADATA = "archive_metadata.json"
 NEW_CONFIGS_METADATA = "new_configs_metadata.json"
-REQUIRED_FILES = {"file1": "group_config.xml", "file2": "thumbnail_settings.xml"}
+REQUIRED_FILES = {"file1": "group_config.xml"}
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -119,45 +119,6 @@ def parse_group_config() -> Dict[str, List[dict]]:
     return dict(student_systems_list)
 
 
-def parse_thumbnail_settings() -> Dict[str, List[dict]]:
-    """Parse thumbnail_settings.xml and return dict of access_codes and their systems"""
-    filepath = os.path.join(app.config["UPLOAD_FOLDER"], REQUIRED_FILES["file2"])
-    if not os.path.exists(filepath):
-        return {}
-
-    thumbnail_systems = {}
-    tree = ET.parse(filepath)
-    root = tree.getroot()
-
-    for item in root.findall(".//thumbnail_item"):
-        access_code = (
-            item.find("access_code").text
-            if item.find("access_code") is not None
-            else None
-        )
-        if access_code:
-            systems = []
-            systems_elem = item.find("systems")
-            if systems_elem is not None:
-                for system in systems_elem.findall("system"):
-                    system_info = {
-                        "ip": (
-                            system.find("ip").text
-                            if system.find("ip") is not None
-                            else ""
-                        ),
-                        "system_note": (
-                            system.find("system_note").text
-                            if system.find("system_note") is not None
-                            else ""
-                        ),
-                    }
-                    systems.append(system_info)
-            thumbnail_systems[access_code] = systems
-
-    return thumbnail_systems
-
-
 def get_all_systems(systems_dict: Dict[str, List[str]]) -> List[str]:
     """Get a unique sorted list of all systems across all access codes"""
     all_systems = set()
@@ -175,12 +136,6 @@ def get_access_codes_from_xml(xml_file: str) -> List[str]:
     # Check if it's group config
     for student in root.findall(".//student"):
         access_code = student.find("access_code")
-        if access_code is not None and access_code.text:
-            access_codes.append(access_code.text)
-
-    # Check if it's thumbnail settings
-    for item in root.findall(".//thumbnail_item"):
-        access_code = item.find("access_code")
         if access_code is not None and access_code.text:
             access_codes.append(access_code.text)
 
@@ -202,36 +157,35 @@ def save_to_archive(files):
     archive_entry = {
         "id": timestamp,
         "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "zip_filename": f"{timestamp}_config_files.zip",
         "files": {},
     }
 
-    # Create zip file
-    zip_path = os.path.join(ARCHIVE_FOLDER, archive_entry["zip_filename"])
-    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zipf:
-        # Process each file
-        for file_key, file in files.items():
-            if file and file.filename:
-                # Save file content to BytesIO for processing
-                file_content = BytesIO(file.read())
+    # Process each file
+    for file_key, file in files.items():
+        if file and file.filename:
+            # Save file content to BytesIO for processing
+            file_content = BytesIO(file.read())
 
-                # Extract access codes
-                file_content.seek(0)
-                access_codes = get_access_codes_from_xml(file_content)
+            # Extract access codes
+            file_content.seek(0)
+            access_codes = get_access_codes_from_xml(file_content)
 
-                # Add file to zip
-                file_content.seek(0)
-                original_name = secure_filename(file.filename)
-                zipf.writestr(original_name, file_content.read())
+            # Save file to archive folder
+            file_content.seek(0)
+            original_name = secure_filename(file.filename)
+            archive_path = os.path.join(ARCHIVE_FOLDER, f"{timestamp}_{original_name}")
+            with open(archive_path, "wb") as f:
+                f.write(file_content.read())
 
-                # Add to entry
-                archive_entry["files"][file_key] = {
-                    "original_name": original_name,
-                    "access_codes": access_codes,
-                }
+            # Add to entry
+            archive_entry["files"][file_key] = {
+                "original_name": original_name,
+                "archive_name": f"{timestamp}_{original_name}",
+                "access_codes": access_codes,
+            }
 
-                # Reset file pointer for later use
-                file.seek(0)
+            # Reset file pointer for later use
+            file.seek(0)
 
     # Add entry to metadata
     metadata.append(archive_entry)
@@ -319,21 +273,16 @@ def about():
 @app.route("/upload", methods=["GET", "POST"])
 def upload():
     if request.method == "POST":
-        # Check if both files are present
-        if "file1" not in request.files or "file2" not in request.files:
-            flash("Both files are required")
+        # Check if file is present
+        if "file1" not in request.files:
+            flash("Group config file is required")
             return redirect(request.url)
 
         file1 = request.files["file1"]
-        file2 = request.files["file2"]
 
-        # Validate each file
+        # Validate file
         if not validate_file(file1, REQUIRED_FILES["file1"]):
-            flash(f"First file must be named {REQUIRED_FILES['file1']}")
-            return redirect(request.url)
-
-        if not validate_file(file2, REQUIRED_FILES["file2"]):
-            flash(f"Second file must be named {REQUIRED_FILES['file2']}")
+            flash(f"File must be named {REQUIRED_FILES['file1']}")
             return redirect(request.url)
 
         # Clear all previous state from session
@@ -354,17 +303,15 @@ def upload():
         session["ip_list"] = ip_list
 
         # Save to archive first
-        archive_entry = save_to_archive({"file1": file1, "file2": file2})
+        archive_entry = save_to_archive({"file1": file1})
 
-        # Reset file pointers
+        # Reset file pointer
         file1.seek(0)
-        file2.seek(0)
 
-        # Save the files to upload folder
+        # Save the file to upload folder
         file1.save(os.path.join(app.config["UPLOAD_FOLDER"], REQUIRED_FILES["file1"]))
-        file2.save(os.path.join(app.config["UPLOAD_FOLDER"], REQUIRED_FILES["file2"]))
 
-        flash("Files uploaded successfully and archived")
+        flash("File uploaded successfully and archived")
         return redirect(url_for("edit_group_config"))
 
     # On GET, restore previous state if it exists
@@ -526,105 +473,6 @@ def edit_group_config():
     return render_template(
         "edit_group_config.html",
         student_systems=student_systems,
-        use_ip_list=use_ip_list,
-        ip_list=ip_list,
-        checked_systems=checked_systems,
-    )
-
-
-@app.route("/edit/thumbnail-settings", methods=["GET", "POST"])
-def edit_thumbnail_settings():
-    thumbnail_systems = parse_thumbnail_settings()
-    if not thumbnail_systems:
-        flash("Please upload thumbnail_settings.xml first")
-        return redirect(url_for("upload"))
-
-    # Get IP list from session
-    use_ip_list = session.get("use_ip_list", False)
-    ip_list = session.get("ip_list", [])
-
-    if request.method == "POST":
-        # Store the checked systems in session
-        checked_systems = {}
-        for access_code in thumbnail_systems.keys():
-            systems = request.form.getlist(f"systems_{access_code}")
-            checked_systems[access_code] = systems
-        session["thumbnail_checked"] = checked_systems
-
-        # Process form data and create new XML
-        new_systems = {}
-        for access_code in thumbnail_systems.keys():
-            systems = request.form.getlist(f"systems_{access_code}")
-            new_systems[access_code] = systems
-
-        # Create new XML file
-        tree = ET.parse(
-            os.path.join(app.config["UPLOAD_FOLDER"], REQUIRED_FILES["file2"])
-        )
-        root = tree.getroot()
-
-        for item in root.findall(".//thumbnail_item"):
-            access_code = (
-                item.find("access_code").text
-                if item.find("access_code") is not None
-                else None
-            )
-            if access_code in new_systems:
-                systems_elem = item.find("systems")
-                if systems_elem is not None:
-                    # Get all current systems
-                    current_systems = systems_elem.findall("system")
-                    # Remove systems not in the new list
-                    for system in list(
-                        current_systems
-                    ):  # Use list() to avoid modification during iteration
-                        system_ip = (
-                            system.find("ip").text
-                            if system.find("ip") is not None
-                            else None
-                        )
-                        if system_ip not in new_systems[access_code]:
-                            systems_elem.remove(system)
-
-        # Save modified XML using custom writer
-        output_path = os.path.join(NEW_CONFIGS_FOLDER, f"new_{REQUIRED_FILES['file2']}")
-        write_xml_file(tree, output_path)
-
-        # Save to new configs archive
-        config_entry = save_new_config(
-            original_files={"file2": request.files.get("file2")},
-            modified_files={"file2": output_path},
-        )
-
-        flash(
-            "New thumbnail_settings.xml has been generated and saved to New Configurations"
-        )
-        return render_template(
-            "edit_thumbnail_settings.html",
-            thumbnail_systems=thumbnail_systems,
-            use_ip_list=use_ip_list,
-            ip_list=ip_list,
-            checked_systems=checked_systems,
-        )
-
-    # On GET, restore previous state if it exists, otherwise initialize from current systems
-    checked_systems = session.get("thumbnail_checked")
-    if checked_systems is None:
-        checked_systems = {}
-        for access_code, systems in thumbnail_systems.items():
-            if use_ip_list:
-                # Only check systems with IPs in the list
-                checked_systems[access_code] = [
-                    system["ip"] for system in systems if system["ip"] in ip_list
-                ]
-            else:
-                # Check all systems
-                checked_systems[access_code] = [system["ip"] for system in systems]
-        session["thumbnail_checked"] = checked_systems
-
-    return render_template(
-        "edit_thumbnail_settings.html",
-        thumbnail_systems=thumbnail_systems,
         use_ip_list=use_ip_list,
         ip_list=ip_list,
         checked_systems=checked_systems,
@@ -854,22 +702,6 @@ def update_checkbox_state():
         elif not is_checked and system_id in checked_systems:
             checked_systems.remove(system_id)
         session["group_config_checked"][access_code] = checked_systems
-        session.modified = True
-
-    elif page_type == "thumbnail":
-        # Initialize if not exists
-        if "thumbnail_checked" not in session:
-            session["thumbnail_checked"] = {}
-        if access_code not in session["thumbnail_checked"]:
-            session["thumbnail_checked"][access_code] = []
-
-        # Update the list
-        checked_systems = session["thumbnail_checked"][access_code]
-        if is_checked and system_id not in checked_systems:
-            checked_systems.append(system_id)
-        elif not is_checked and system_id in checked_systems:
-            checked_systems.remove(system_id)
-        session["thumbnail_checked"][access_code] = checked_systems
         session.modified = True
 
     return {"status": "success"}

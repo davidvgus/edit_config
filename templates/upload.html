@@ -4,15 +4,11 @@
 
 {% block content %}
 <div class="container mt-4">
-    <h2>Upload Configuration Files</h2>
+    <h2>Upload Configuration File</h2>
     <form method="POST" enctype="multipart/form-data">
         <div class="mb-3">
             <label for="file1" class="form-label">Group Config XML</label>
             <input type="file" class="form-control" id="file1" name="file1" accept=".xml">
-        </div>
-        <div class="mb-3">
-            <label for="file2" class="form-label">Thumbnail Settings XML</label>
-            <input type="file" class="form-control" id="file2" name="file2" accept=".xml">
         </div>
         <div class="mb-3">
             <div class="form-check">
@@ -28,7 +24,7 @@
                     endif %}>{{ ip_list_text }}</textarea>
             </div>
         </div>
-        <button type="submit" class="btn btn-primary">Upload Files</button>
+        <button type="submit" class="btn btn-primary">Upload File</button>
     </form>
 </div>
 

@@ -27,10 +27,6 @@
                             href="{{ url_for('edit_group_config') }}">Edit Group Config</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {% if request.endpoint == 'edit_thumbnail_settings' %}active{% endif %}"
-                            href="{{ url_for('edit_thumbnail_settings') }}">Edit Thumbnail Settings</a>
-                    </li>
-                    <li class="nav-item">
                         <a class="nav-link {% if request.endpoint == 'new_configs' %}active{% endif %}"
                             href="{{ url_for('new_configs') }}">New Configurations</a>
                     </li>
